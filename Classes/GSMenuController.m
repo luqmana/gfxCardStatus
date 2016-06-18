@@ -25,6 +25,7 @@
 @interface GSMenuController (Internal)
 - (void)_localizeMenu;
 - (void)_updateProcessList;
+- (int)_killProcesses;
 - (void)_updateMenuBarIconText:(BOOL)isUsingIntegrated cardString:(NSString *)cardString;
 @end
 
@@ -48,6 +49,7 @@
 @synthesize processesSeparator;
 @synthesize dependentProcesses;
 @synthesize processList;
+@synthesize killProcessesItem;
 
 @synthesize menuIsOpen;
 
@@ -144,6 +146,12 @@
 }
 
 #pragma mark - UI Actions
+
+- (IBAction)killProcesses:(id)sender
+{
+    GTMLoggerInfo(@"Ayyyyy doing magic!");
+    [self _killProcesses];
+}
 
 - (IBAction)openAbout:(id)sender
 {
@@ -278,6 +286,7 @@
     [processList setHidden:hide];
     [processesSeparator setHidden:hide];
     [dependentProcesses setHidden:hide];
+    [killProcessesItem setHidden:hide];
 
     // If we're using a 9400M/9600M GT model, or if we're on the integrated GPU,
     // no need to display/update the dependencies list.
@@ -289,6 +298,7 @@
     NSArray *processes = [GSProcess getTaskList];
     
     [processList setHidden:([processes count] > 0)];
+    [killProcessesItem setHidden:NO];
     
     for (NSDictionary *dict in processes) {
         NSString *taskName = [dict objectForKey:kTaskItemName];
@@ -304,6 +314,27 @@
         [statusMenu insertItem:item 
                        atIndex:([statusMenu indexOfItem:processList] + 1)];
     }
+}
+
+- (int)_killProcesses
+{
+    BOOL isUsingIntegrated = [GSMux isUsingIntegratedGPU];
+
+    // Only need to kill processes if in discrete mode
+    if (isUsingIntegrated)
+        return true;
+
+    GTMLoggerDebug(@"Killing processes using discrete GPU...");
+
+    NSArray *processes = [GSProcess getTaskList];
+
+    BOOL ret = YES;
+    for (NSDictionary *dict in processes) {
+        NSString *pid = [dict objectForKey:kTaskItemPID];
+        ret |= kill([pid intValue], SIGTERM);
+    }
+
+    return ret;
 }
 
 - (void)_updateMenuBarIconText:(BOOL)isUsingIntegrated cardString:(NSString *)cardString
